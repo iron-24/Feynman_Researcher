@@ -7,12 +7,14 @@ Nodes never mutate state in-place — they return only the keys they change.
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-from anthropic import Anthropic
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
 from feynman.agent.prompts import (
     ASSESS_KNOWLEDGE,
@@ -33,8 +35,15 @@ from feynman.retrieval.vector_store import VectorStore, SearchResult
 load_dotenv()
 log = structlog.get_logger()
 
-MODEL = "claude-sonnet-4-20250514"
-_claude = Anthropic()
+MODEL = "models/gemini-3.1-flash-lite"
+_client: genai.Client | None = None
+
+
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    return _client
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -404,15 +413,29 @@ def summarize_node(state: AgentState) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _call_claude(system: str, user: str, temperature: float = 0.7) -> str:
-    """Single-turn Claude call. Returns the assistant's text content."""
-    resp = _claude.messages.create(
-        model=MODEL,
-        max_tokens=2048,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-        temperature=temperature,
-    )
-    return resp.content[0].text
+    """Single-turn Gemini call. Returns the model's text response."""
+    try:
+        resp = _get_client().models.generate_content(
+            model=MODEL,
+            contents=user,
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                temperature=temperature,
+                max_output_tokens=2048,
+            ),
+        )
+        return resp.text
+    except Exception as exc:
+        msg = str(exc)
+        if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+            raise RuntimeError(
+                "You have exceeded your Gemini API quota. Check your usage at https://ai.dev/rate-limit."
+            ) from None
+        if "503" in msg or "UNAVAILABLE" in msg:
+            raise RuntimeError(
+                "Gemini is temporarily overloaded — please wait a few seconds and try again."
+            ) from None
+        raise RuntimeError(f"Gemini API error: {exc}") from None
 
 
 def _parse_json(text: str) -> Dict:

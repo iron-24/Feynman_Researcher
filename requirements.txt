@@ -1,5 +1,5 @@
 # Core agent
-anthropic>=0.40.0
+google-genai>=1.0.0
 langgraph>=0.2.28
 langchain-core>=0.3.0
 
