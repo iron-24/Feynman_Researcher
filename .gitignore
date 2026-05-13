@@ -1,0 +1,42 @@
+# Test / scratch scripts
+test_*.py
+scratch_*.py
+
+# Environment
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Interview prep — not for public repo
+interview_prep/
+
+# Data / indices
+*.faiss
+*.pkl
+data/
+sessions/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Build / dist
+*.egg-info/
+dist/
+build/
+*.egg
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log

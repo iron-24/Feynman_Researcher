@@ -1,0 +1,27 @@
+# Core agent
+anthropic>=0.40.0
+langgraph>=0.2.28
+langchain-core>=0.3.0
+
+# Paper retrieval
+arxiv>=2.1.0
+requests>=2.32.0
+
+# PDF parsing
+pymupdf>=1.24.0
+tiktoken>=0.7.0
+
+# Embeddings + vector store
+# NOTE: faiss-cpu and torch may not have Python 3.14 wheels yet.
+# If install fails, try: pip install faiss-cpu --pre
+# or downgrade to Python 3.12 as a fallback.
+sentence-transformers>=3.1.0
+faiss-cpu>=1.8.0
+torch>=2.4.0          # MPS support on Apple Silicon
+
+# Interface
+gradio>=4.44.0
+
+# Infrastructure
+python-dotenv>=1.0.1
+structlog>=24.4.0
