@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from feynman.agent.graph import feynman_graph
-from feynman.agent.nodes import explain_node, summarize_node
+from feynman.agent.nodes import explain_node, set_api_key, summarize_node
 from feynman.agent.state import AgentState
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -121,8 +121,12 @@ def respond(
     message: str,
     history: List,
     state: Dict,
+    api_key: str = "",
 ) -> Generator[Tuple, None, None]:
     """Main chat handler.  Yields a loading placeholder, then the real response."""
+    if api_key:
+        set_api_key(api_key)
+
     message = (message or "").strip()
     if not message:
         yield history, state, _papers_rows(state), _progress_md(state), ""
@@ -233,6 +237,15 @@ def create_app() -> gr.Blocks:
 
         agent_state = gr.State({})
 
+        # Only shown when GOOGLE_API_KEY is not set in the environment (e.g. HuggingFace Spaces)
+        _env_key_set = bool(os.getenv("GOOGLE_API_KEY"))
+        api_key_input = gr.Textbox(
+            label="Google API Key",
+            placeholder="AIza... (get one free at aistudio.google.com/apikey)",
+            type="password",
+            visible=not _env_key_set,
+        )
+
         gr.Markdown(
             "# Feynman\n"
             "*Learn any topic from first principles — knowledge sourced entirely from research papers*"
@@ -295,12 +308,12 @@ def create_app() -> gr.Blocks:
 
         msg_box.submit(
             fn=respond,
-            inputs=[msg_box, chatbot, agent_state],
+            inputs=[msg_box, chatbot, agent_state, api_key_input],
             outputs=stream_outs,
         )
         send_btn.click(
             fn=respond,
-            inputs=[msg_box, chatbot, agent_state],
+            inputs=[msg_box, chatbot, agent_state, api_key_input],
             outputs=stream_outs,
         )
         deeper_btn.click(

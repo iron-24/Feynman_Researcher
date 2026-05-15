@@ -37,12 +37,26 @@ log = structlog.get_logger()
 
 MODEL = "models/gemini-3.1-flash-lite"
 _client: genai.Client | None = None
+_api_key_override: str | None = None
+
+
+def set_api_key(key: str) -> None:
+    """Override the API key at runtime (used for public HuggingFace deployment)."""
+    global _client, _api_key_override
+    if key and key.strip():
+        _api_key_override = key.strip()
+        _client = None  # force client to be recreated with new key
 
 
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        key = _api_key_override or os.getenv("GOOGLE_API_KEY")
+        if not key:
+            raise RuntimeError(
+                "No API key found. Set GOOGLE_API_KEY in .env or enter it in the UI."
+            )
+        _client = genai.Client(api_key=key)
     return _client
 
 
