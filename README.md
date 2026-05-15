@@ -1,13 +1,3 @@
----
-title: Feynman-Researcher
-emoji: 🧠
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # Feynman
 
 *Learn any technical topic from first principles — taught by research papers, not blog posts.*
