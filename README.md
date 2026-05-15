@@ -1,16 +1,18 @@
 # Feynman
 
-*Learn any technical topic from first principles — taught by research papers, not blog posts.*
+*Learn any technical topic from first principles - taught by research papers, not blog posts.*
 
-Feynman is an agentic research assistant that takes you from zero to deep understanding of any technical topic. You type a topic, the agent autonomously fetches and reads relevant papers from ArXiv, builds an ordered concept curriculum, then teaches you interactively — checking genuine comprehension at each step before moving on, and re-explaining with a different analogy if you don't get it.
+Feynman is an agentic research assistant that takes you from zero to deep understanding of any technical topic. You provide a topic, the agent autonomously retrieves and analyzes relevant papers from ArXiv, builds a structured concept curriculum, then teaches you interactively. It checks your understanding at each step before moving forward and re-explains concepts using different analogies when needed.
 
 Inspired by Richard Feynman's principle: **if you can't explain it simply, you don't understand it yet.**
 
----
+## How It Works
 
-## Demo
+The system operates in three phases:
 
-> *Demo GIF coming after first recorded session — record with `brew install licecap`*
+1. **Research** - Fetch ArXiv papers, enrich with citation metadata, parse PDFs, and extract a conceptually ordered curriculum
+2. **Calibrate** - Ask assessment questions to infer your background level (beginner, intermediate, or advanced)
+3. **Teach** - Deliver paper-grounded explanations, check understanding through Socratic questions, and iterate until mastery
 
 ---
 
@@ -18,47 +20,45 @@ Inspired by Richard Feynman's principle: **if you can't explain it simply, you d
 
 ```mermaid
 flowchart TD
-    A([🧑 User enters topic]) --> B
+    A["User enters topic"] --> B
 
-    subgraph Turn 1 — Research
-        B[research_node\nFetch ArXiv papers\nEnrich with Semantic Scholar citations\nParse PDFs → FAISS index\nExtract ordered concept curriculum]
+    subgraph research["Research Phase"]
+        B["Fetch ArXiv papers<br/>Enrich with citations<br/>Parse PDFs to FAISS<br/>Extract concept curriculum"]
     end
 
-    B --> C([❓ Assessment questions sent to user])
+    B --> C["Assessment questions"]
     C --> D
 
-    subgraph Turn 2 — Calibrate
-        D[assess_node\nInfer user level\nbeginner · intermediate · advanced] --> E
-        E[explain_node\nRAG retrieval from FAISS\nFeynman-style explanation\nCites papers by title\nEnds with Socratic question]
+    subgraph calibrate["Calibrate Phase"]
+        D["Infer user level<br/>beginner/intermediate/advanced"] --> E
+        E["RAG retrieval from FAISS<br/>Feynman-style explanation<br/>Cites papers by title"]
     end
 
-    E --> F([💬 Explanation + question sent to user])
+    E --> F["Explanation + Socratic question"]
     F --> G
 
-    subgraph Turn 3+ — Teach
-        G{User message intent}
-        G -->|Answers question| H[check_node\nEvaluate understanding\nnot just recall]
-        G -->|go deeper / tell me more| I[drill_node\nFetch extra targeted papers\nDeep paper-grounded explanation]
-        H -->|understood| J{More concepts?}
-        H -->|gaps remain| E
-        J -->|yes| E
-        J -->|no| K[summarize_node\nFeynman summary\nthe final test]
+    subgraph teach["Teaching Phase"]
+        G{User intent}
+        G -->|Answers question| H["Evaluate understanding"]
+        G -->|Go deeper| I["Fetch targeted papers<br/>Deeper explanation"]
+        H -->|Understood| J{More concepts?}
+        H -->|Gaps remain| E
+        J -->|Yes| E
+        J -->|No| K["Final Feynman summary"]
         I --> F
     end
 
-    K --> L([✅ Session complete])
+    K --> L["Session complete"]
 ```
 
 ---
 
-## Eval Results
+## Evaluation Results
 
-============================================================
-TOPIC:                  Vision Transformers
-CONCEPTS EVALUATED:     6
-AVG FEYNMAN SCORE:      4.00/5  (target ≥ 3.8)
-AVG HALLUCINATION RATE: 18.9%  (target < 5%)
-============================================================
+**Vision Transformers Case Study**
+- Concepts Evaluated: 6
+- Avg Feynman Score: 4.00/5 (target >= 3.8) ✓
+- Avg Hallucination Rate: 18.9% (target < 5%) - in progress
 
 | Concept | Feynman Score | Hallucination Rate |
 |---|---|---|
@@ -69,43 +69,43 @@ AVG HALLUCINATION RATE: 18.9%  (target < 5%)
 | Cross-Domain and Multi-Modal Adaptation | 4/5 | 9.5% |
 | Task-Specific Architectural Optimization | 4/5 | 17.6% |
 
-**Targets:** avg Feynman score ≥ 3.8 (Achieved) · hallucination rate < 5% (WIP)
+**Targets:** avg Feynman score >= 3.8 (Achieved) - hallucination rate < 5% (In progress)
 
 ---
 
 ## Design Decisions
 
-### Why LangGraph over a simple prompt chain
-A chain is linear: A → B → C → done. Teaching requires cycles: explain → check → re-explain → check again. LangGraph's `StateGraph` models this as a first-class directed graph with conditional edges, so the retry loop is structural rather than bolted on with `if` statements. The typed `AgentState` TypedDict also makes debugging explicit — you can inspect exactly what changed after each node.
+### Why LangGraph Over Simple Prompt Chains
+Teaching requires cycles: explain - check - re-explain - check again. A linear prompt chain cannot model this naturally. LangGraph's `StateGraph` treats the retry loop as a first-class directed graph with conditional edges, making the flow explicit rather than buried in conditional logic. The typed `AgentState` also aids debugging - you can inspect exactly what changed after each node execution.
 
-### Why ArXiv + Semantic Scholar over web search
-Web search returns a mix of blog posts, Stack Overflow answers, YouTube transcripts, and marketing copy — high noise, unverifiable claims, no ground truth. ArXiv papers are peer-reviewed, citable, and written by the people who actually built the things being explained. Semantic Scholar adds citation counts, which are a reliable proxy for foundational importance: a paper cited 3,000 times is almost certainly more important to understand than one cited 12 times. The constraint also makes the product's claims auditable — every explanation must cite a paper by title.
+### Why ArXiv and Semantic Scholar Over Web Search
+Web search returns a mix of blog posts, tutorials, and marketing copy — high noise with unverifiable claims. ArXiv papers are peer-reviewed and written by researchers who built the systems being explained. Semantic Scholar adds citation counts, a reliable proxy for foundational importance: a paper cited 3,000 times is almost certainly more essential than one cited 12 times. Every explanation must cite a paper by title, making the product's claims auditable.
 
-### Why sentence-transformers locally vs. API embeddings
-`all-MiniLM-L6-v2` runs on-device (MPS on Apple Silicon, CPU elsewhere) with no API call, no latency, and no per-token cost. At the scale of a single session (~1,200 chunks from 10 papers), local inference is instantaneous. OpenAI or Gemini embeddings would add ~$0.01/session in cost, an extra network round-trip per search, and a hard dependency on an external service that would break HuggingFace deployment if the key weren't set. The model is small enough (80 MB) to embed directly in the Space.
+### Why Local Embeddings Over API Services
+`all-MiniLM-L6-v2` runs on-device with no API calls, minimal latency, and zero per-token cost. At the scale of a single session (~1,200 chunks from 10 papers), local inference is instantaneous. External embedding APIs would add network overhead, per-session costs, and create a hard dependency that breaks deployment if credentials are missing. The model is small enough (80 MB) to embed directly.
 
-### The check_node retry loop — measuring understanding
-"Understood" is evaluated by asking the LLM whether the user's answer demonstrates that they can *apply or extend* the concept, not just recall the wording used in the explanation. The prompt explicitly says "credit correct intuition even with imperfect terminology." This is the core Feynman mechanic: you only advance when you've actually understood, not when you've produced the right-sounding words. When the check fails, `reexplain=True` is set in state, and `explain_node` switches to the `RE_EXPLAIN_CONCEPT` prompt which requires a completely different analogy — not a slower repetition of the same framing.
+### Understanding Evaluation in the check_node
+"Understood" means the user can apply or extend the concept, not merely recall it. The evaluation prompt explicitly credits correct intuition even with imperfect terminology. This is the core Feynman principle: advancement requires genuine comprehension, not just right-sounding words. When understanding gaps are detected, `reexplain=True` triggers a completely different analogy in the RE_EXPLAIN_CONCEPT prompt - not a slower repetition of the original explanation.
 
 ---
 
-## Stack
+## Tech Stack
 
 | Component | Technology |
 |---|---|
-| Agent orchestration | LangGraph `StateGraph` |
-| LLM | Google Gemini (`gemini-2.0-flash`) |
-| Paper retrieval | ArXiv API + Semantic Scholar API |
-| PDF parsing | PyMuPDF (`fitz`) |
-| Token counting | tiktoken |
+| Agent Orchestration | LangGraph `StateGraph` |
+| Language Model | Google Gemini (`gemini-2.0-flash`) |
+| Paper Retrieval | ArXiv API + Semantic Scholar API |
+| PDF Parsing | PyMuPDF (`fitz`) |
+| Token Counting | tiktoken |
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (MPS) |
-| Vector store | FAISS `IndexFlatIP` |
-| Interface | Gradio 6 |
+| Vector Store | FAISS `IndexFlatIP` |
+| User Interface | Gradio 6 |
 | Deployment | HuggingFace Spaces (Docker) |
 
 ---
 
-## Quickstart
+## Getting Started
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/Feynman_Researcher
@@ -125,18 +125,18 @@ Get a free Gemini API key at [aistudio.google.com/apikey](https://aistudio.googl
 
 ---
 
-## Limitations
+## Known Limitations
 
-**Works well**
-- Topics with a large ArXiv presence: deep learning, NLP, computer vision, RL
-- Foundational ML papers (transformers, diffusion, GNNs) — well-cited, well-parsed PDFs
-- Intermediate learners with some ML background — the calibration is most accurate here
+**Performs well on:**
+- Topics with substantial ArXiv coverage: deep learning, NLP, computer vision, reinforcement learning
+- Foundational ML papers (transformers, diffusion models, graph neural networks) — well-cited with clean PDFs
+- Intermediate learners with some ML background — calibration is most accurate for this level
 
-**Works less well**
-- Very new topics (< 6 months old) — too few papers to build a solid curriculum
-- Highly mathematical topics — PDF parsing loses LaTeX equations, so proofs are missing from context
-- Interdisciplinary topics (e.g. "ML for drug discovery") — concept ordering is less reliable when papers span very different fields
-- Two-column PDF layouts — PyMuPDF extracts them as garbled text; section detection fails
+**May underperform on:**
+- Very recent topics (less than 6 months old) — insufficient papers to build a solid curriculum
+- Highly mathematical subjects — PDF parsing loses LaTeX equations, removing proofs from context
+- Interdisciplinary topics (e.g., "ML for drug discovery") — concept ordering is less reliable across diverse paper sets
+- Two-column PDF layouts — PyMuPDF extracts them as garbled text, breaking section detection
 
 ---
 
@@ -146,8 +146,8 @@ Get a free Gemini API key at [aistudio.google.com/apikey](https://aistudio.googl
 feynman/
 ├── agent/
 │   ├── graph.py        # LangGraph StateGraph definition
-│   ├── nodes.py        # 6 node functions (research/assess/explain/check/drill/summarize)
-│   ├── prompts.py      # All prompt templates
+│   ├── nodes.py        # Node implementations (research/assess/explain/check/drill/summarize)
+│   ├── prompts.py      # Prompt templates
 │   └── state.py        # AgentState TypedDict
 ├── retrieval/
 │   ├── arxiv_client.py      # ArXiv API wrapper
@@ -155,8 +155,8 @@ feynman/
 │   ├── pdf_parser.py        # PyMuPDF + tiktoken chunking
 │   └── vector_store.py      # FAISS + sentence-transformers
 └── eval/
-    └── citation_checker.py  # Hallucination rate measurement
+    └── citation_checker.py  # Hallucination measurement
 app.py              # Gradio interface
 notebooks/
-└── eval_feynman.ipynb  # Feynman score + hallucination eval
+└── eval_feynman.ipynb  # Evaluation harness
 ```
